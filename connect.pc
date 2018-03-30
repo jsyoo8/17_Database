@@ -1,0 +1,583 @@
+exec sql begin declare section;
+
+char usrname[20] = "SCOTT/TIGER";
+int cus_key;
+char cus_id[20];
+char cus_pwd[20];
+char cus_name[20];
+char cus_birth[20];
+char cus_phone[20];
+int mov_id;
+char mov_name[20];
+float mov_sales;
+int tht_id;
+int seats;
+int scr_id;
+int scr_date;
+int scr_time;
+int res_id;
+int seat_id;
+int sum;
+int flag;
+
+exec sql end declare section;
+
+exec sql include sqlca;
+
+#include<stdio.h>
+#include<conio.h>
+#include<stdlib.h>
+#include<string.h>
+
+
+// init database
+void init() {
+	EXEC SQL DELETE FROM customer;
+	EXEC SQL DELETE FROM movie;
+	EXEC SQL DELETE FROM theater;
+	EXEC SQL DELETE FROM screen;
+	EXEC SQL DELETE FROM reservation;
+	EXEC SQl COMMIT;
+}
+
+// input example data
+void inputExam() {
+	EXEC SQL INSERT INTO customer (cus_key, cus_id, cus_pwd, cus_name, cus_birth, cus_phone) VALUES (1, 'id1', 'pwd1', 'name1', '941011', '01011111111');
+	EXEC SQL INSERT INTO customer (cus_key, cus_id, cus_pwd, cus_name, cus_birth, cus_phone) VALUES (2, 'id2', 'pwd2', 'name2', '941012', '01022222222');
+	EXEC SQL INSERT INTO customer (cus_key, cus_id, cus_pwd, cus_name, cus_birth, cus_phone) VALUES (3, 'id3', 'pwd3', 'name3', '941013', '01033333333');
+	EXEC SQL INSERT INTO customer (cus_key, cus_id, cus_pwd, cus_name, cus_birth, cus_phone) VALUES (4, 'id4', 'pwd4', 'name4', '941014', '01044444444');
+	EXEC SQL INSERT INTO customer (cus_key, cus_id, cus_pwd, cus_name, cus_birth, cus_phone) VALUES (5, 'id5', 'pwd5', 'name5', '941015', '01055555555');
+	EXEC SQL INSERT INTO customer (cus_key, cus_id, cus_pwd, cus_name, cus_birth, cus_phone) VALUES (6, 'id6', 'pwd6', 'name6', '941016', '01066666666');
+	EXEC SQL INSERT INTO movie (mov_id, mov_name, mov_sales) VALUES (1, 'movie1', 1.0);
+	EXEC SQL INSERT INTO movie (mov_id, mov_name, mov_sales) VALUES (2, 'movie2', 1.0);
+	EXEC SQL INSERT INTO movie (mov_id, mov_name, mov_sales) VALUES (3, 'movie3', 3.0);
+	EXEC SQL INSERT INTO movie (mov_id, mov_name, mov_sales) VALUES (4, 'movie4', 1.0);
+	EXEC SQL INSERT INTO movie (mov_id, mov_name, mov_sales) VALUES (5, 'movie5', 0.0);
+	EXEC SQL INSERT INTO theater (tht_id, seats) VALUES (1, 100);
+	EXEC SQL INSERT INTO theater (tht_id, seats) VALUES (2, 110);
+	EXEC SQL INSERT INTO theater (tht_id, seats) VALUES (3, 120);
+	EXEC SQL INSERT INTO screen (scr_id, mov_id, tht_id, scr_date, scr_time) VALUES (1, 1, 1, 1205, 2000);
+	EXEC SQL INSERT INTO screen (scr_id, mov_id, tht_id, scr_date, scr_time) VALUES (2, 3, 3, 1205, 2000);
+	EXEC SQL INSERT INTO screen (scr_id, mov_id, tht_id, scr_date, scr_time) VALUES (3, 2, 2, 1205, 2000);
+	EXEC SQL INSERT INTO screen (scr_id, mov_id, tht_id, scr_date, scr_time) VALUES (4, 3, 1, 1206, 2000);
+	EXEC SQL INSERT INTO screen (scr_id, mov_id, tht_id, scr_date, scr_time) VALUES (5, 4, 1, 1207, 2000);
+	EXEC SQL INSERT INTO screen (scr_id, mov_id, tht_id, scr_date, scr_time) VALUES (6, 3, 3, 1207, 2000);
+	EXEC SQL INSERT INTO reservation (res_id, cus_key, scr_id, seat_id) VALUES (1, 1, 1, 10);
+	EXEC SQL INSERT INTO reservation (res_id, cus_key, scr_id, seat_id) VALUES (2, 1, 1, 11);
+	EXEC SQL INSERT INTO reservation (res_id, cus_key, scr_id, seat_id) VALUES (3, 5, 1, 65);
+	EXEC SQL INSERT INTO reservation (res_id, cus_key, scr_id, seat_id) VALUES (4, 5, 1, 66);
+	EXEC SQL INSERT INTO reservation (res_id, cus_key, scr_id, seat_id) VALUES (5, 5, 1, 10);
+	EXEC SQL INSERT INTO reservation (res_id, cus_key, scr_id, seat_id) VALUES (6, d, 3, 11);
+	EXEC SQL COMMIT;
+}
+
+// if failed return -1
+int login() {
+	int input;
+	char id[20];
+	char pwd[20];
+
+	while(1) {
+		printf("1. Login\n2. Sign Up\n");
+		scanf(" %d", &input);
+		if(input == 1){
+			printf("id : ");
+			scanf(" %s", id);
+			printf("pwd : ");
+			scanf(" %s", pwd);
+			if(!(strcmp(id, "system") || strcmp(pwd, "pwd"))){
+				return 2;
+			}
+
+			EXEC SQL DECLARE cus_cursor1 CURSOR FOR SELECT cus_key, cus_id, cus_pwd FROM customer;
+			EXEC SQL OPEN cus_cursor1;
+			while(1) {
+				EXEC SQL FETCH cus_cursor1
+				INTO :cus_key, :cus_id, :cus_pwd;
+				if(sqlca.sqlcode != 0) {
+					break;
+				}
+				else {
+					if(!(strncmp(id, cus_id, strlen(id)) || strncmp(pwd, cus_pwd, strlen(pwd)))){
+						EXEC SQL CLOSE cus_cursor1;
+						return 1;
+					}
+				}
+			}
+			EXEC SQL CLOSE cus_cursor1;
+		}
+		else if(input == 2) {
+			return 0;
+		}
+		else {
+			printf("다시 입력 하세요.");
+		}
+	}
+}
+
+// if failed return 0, else return 1
+int signup() {
+	char id[20];
+	EXEC SQL DECLARE cus_cursor2 CURSOR FOR SELECT cus_id FROM customer;
+	while(1){
+		printf("system과 exit입력 시 종료\n");
+		printf("id : ");
+		scanf(" %s", id);
+		if(!(strcmp(id, "system") && strcmp(id, "exit"))) {
+			return 0;
+		}
+		
+		EXEC SQL OPEN cus_cursor2;
+		while(1) {
+			EXEC SQL FETCH cus_cursor2
+			INTO :cus_id;
+			if(sqlca.sqlcode != 0) {
+				printf("pwd : ");
+				scanf(" %s", cus_pwd);
+				printf("name : ");
+				scanf(" %s", cus_name);
+				printf("birth(주민번호 앞 6자리) : ");
+				scanf(" %s", cus_birth);
+				printf("phone(- 없이) : ");
+				scanf(" %s", cus_phone);
+	
+				EXEC SQL SELECT * INTO :cus_key FROM (SELECT data.*, ROWNUM rm FROM (SELECT cus_key FROM customer ORDER BY cus_key DESC) data) WHERE rm >= 1 AND rm <= 1;
+				cus_key++;
+				EXEC SQL INSERT INTO customer (cus_key, cus_id, cus_pwd, cus_name, cus_birth, cus_phone) VALUES (:cus_key, :cus_id, :cus_pwd, :cus_name, :cus_birth, :cus_phone);
+				EXEC SQL COMMIT WORK;
+				EXEC SQL CLOSE cus_cursor2;
+				return 1;
+			}
+			else {
+				// select result exist
+				if(!strncmp(id, cus_id, strlen(id))) {
+					printf("중복된 id입니다.");
+					break;
+				}
+			}
+		}
+		EXEC SQL CLOSE cus_cursor2;
+	}
+}
+
+int clientSelect() {
+	int input;
+	printf("원하시는 기능을 선택하세요(종료 희망시 제시된 숫자 제외한 숫자 아무거나 입력)\n");
+	printf("1. 정보변경\n");
+	printf("2. 회원탈퇴\n");
+	printf("3. 영화조회\n");
+	printf("4. 예매\n");
+	printf("5. 예매조회\n");
+	printf("6. 예매취소\n");
+
+	scanf(" %d", &input);
+	return input+2;
+}
+
+int systemSelect() {
+	int input;
+	printf("원하시는 기능을 선택하세요(종료 희망시 제시된 숫자 제외한 숫자 아무거나 입력)\n");
+	printf("1. 영화추가\n");
+	printf("2. 영화조회\n");
+	printf("3. 영화수정\n");
+
+	scanf(" %d", &input);
+	return input+8;
+}
+
+int modifyPerson() {
+	int input;
+	EXEC SQL UPDATE customer SET cus_id = :cus_id, cus_pwd = :cus_pwd, cus_name = :cus_name, cus_birth = :cus_birth, cus_phone = :cus_phone WHERE cus_key = :cus_key;
+	EXEC SQL COMMIT;
+	EXEC SQL SELECT cus_id, cus_pwd, cus_name, cus_birth, cus_phone INTO :cus_id, :cus_pwd, :cus_name, :cus_birth, :cus_phone FROM customer WHERE cus_key = :cus_key;
+	EXEC SQL COMMIT;
+	while(1) {
+		printf("원하시는 수정 항목을 입력하세요(종료 희망시 제시된 숫자 제외한 숫자 아무거나 입력)\n");
+		printf("1. 비밀번호 변경\n");
+		printf("2. 이름 변경\n");
+		printf("3. 생년월일 변경\n");
+		printf("4. 전화번호 변경\n");
+		scanf(" %d", &input);
+		// pwd
+		if(input == 1) {
+			printf("바꿀 비밀번호 : ");
+			scanf(" %s", cus_pwd);
+			EXEC SQL UPDATE customer SET cus_pwd = :cus_pwd WHERE cus_key = :cus_key;
+			EXEC SQL COMMIT;
+		}
+		// name
+		else if(input == 2) {
+			printf("바꿀 이름 : ");
+			scanf(" %s", cus_name);
+			EXEC SQL UPDATE customer SET cus_name = :cus_name WHERE cus_key = :cus_key;
+			EXEC SQL COMMIT;
+		}
+		// birth
+		else if(input == 3) {
+			printf("바꿀 생일 : ");
+			scanf(" %s", cus_birth);
+			EXEC SQL UPDATE customer SET cus_birth = :cus_birth WHERE cus_key = :cus_key;
+			EXEC SQL COMMIT;	
+		}
+		// phone
+		else if(input == 4) {
+			printf("바꿀 전화번호 : ");
+			scanf(" %s", cus_phone);
+			EXEC SQL UPDATE customer SET cus_phone = :cus_phone WHERE cus_key = :cus_key;
+			EXEC SQL COMMIT;	
+		}
+		// exit
+		else {
+			return 1;
+		}
+	}
+}
+
+int terminate() {
+	int input;
+	printf("탈퇴를 하시겠습니까?\n");
+	printf("1. 예\n");
+	printf("2. 아니오\n");
+	scanf(" %d", &input);
+	
+	// terminate sign up information
+	if(input == 1) {
+		EXEC SQL DELETE FROM customer WHERE cus_key = :cus_key;
+		EXEC SQL COMMIT;
+		return 0;
+	}
+	// exit
+	else {
+		return 1;
+	}
+}
+
+void checkMovie() {
+	int input;
+	EXEC SQL SELECT sum(mov_sales) INTO :sum FROM movie;
+	EXEC SQL COMMIT;
+	if(sum == 0) {
+		sum = 1;
+	}
+	EXEC SQL DECLARE mov_cursor CURSOR FOR SELECT mov_name, mov_sales FROM movie ORDER BY mov_sales DESC, mov_id;
+	printf("영화명\t\t\t예매율\n");
+	EXEC SQL OPEN mov_cursor;
+	input = 1;
+	while(1) {
+		EXEC SQL FETCH mov_cursor
+		INTO :mov_name, :mov_sales;
+		if(sqlca.sqlcode != 0) {
+			EXEC SQL ROLLBACK WORK;
+			break;
+		}
+		else {
+			EXEC SQL COMMIT WORK;
+			printf("%d. %s\t%f\n", input++, mov_name, (mov_sales/(float)sum));
+		}
+	}
+	EXEC SQL CLOSE mov_cursor;
+}
+
+int reservate() {
+	int input, seat;
+
+	// movie title
+	printf("영화 선택\n");
+	checkMovie();
+	scanf(" %d", &input);
+	sum = input;
+	EXEC SQL SELECT * INTO :mov_id, :mov_name FROM (SELECT data.*, ROWNUM rm FROM (SELECT mov_id, mov_name FROM movie ORDER BY mov_sales DESC, mov_id) data) WHERE rm >= :sum AND rm <= :sum;
+	EXEC SQL COMMIT;
+	
+	// scr_date
+	printf("날짜 선택\n");
+	EXEC SQL DECLARE date_cursor CURSOR FOR SELECT scr_date FROM screen WHERE mov_id = :mov_id ORDER BY scr_id;
+	input = 1;
+	printf("날짜\n");
+	EXEC SQL OPEN date_cursor;
+	while(1) {
+		EXEC SQL FETCH date_cursor
+		INTO :scr_date;
+		if(sqlca.sqlcode != 0) {
+			break;
+		}	
+		else {
+			printf("%d. %d\n", input++, scr_date);		
+		}		
+	}
+	EXEC SQL CLOSE date_cursor;
+	
+	scanf(" %d", &input);
+	EXEC SQL SELECT * INTO :scr_date FROM (SELECT data.*, ROWNUM rm FROM (SELECT scr_date FROM screen WHERE mov_id = :mov_id ORDER BY scr_id) data) WHERE rm >= :scr_id AND rm <= :scr_id;
+	EXEC SQL COMMIT;
+
+	// scr_time
+	printf("시간 선택\n");
+	EXEC SQL DECLARE time_cursor CURSOR FOR SELECT scr_time FROM screen WHERE (mov_id = :mov_id) AND (scr_date = :scr_date) ORDER BY scr_id;
+	input = 1;
+	printf("시간\n");
+	EXEC SQL OPEN time_cursor;
+	while(1) {
+		EXEC SQL FETCH time_cursor
+		INTO :scr_time;
+		if(sqlca.sqlcode != 0) {
+			break;
+		}		
+		else{
+			printf("%d. %d\n", input++, scr_time);
+		}
+	}
+	EXEC SQL CLOSE time_cursor;	
+	
+	scanf(" %d", &input);
+	EXEC SQL SELECT * INTO :scr_time FROM (SELECT data.*, ROWNUM rm FROM (SELECT scr_time FROM screen WHERE mov_id = :mov_id AND scr_date = :scr_date ORDER BY scr_id) data) WHERE rm >= :scr_id AND rm <= :scr_id;
+	EXEC SQL COMMIT;
+
+	EXEC SQL SELECT scr_id, tht_id INTO :scr_id, :tht_id FROM screen WHERE mov_id = :mov_id AND scr_date = :scr_date AND scr_time = :scr_time;
+	EXEC SQL COMMIT;
+
+
+	// seat
+	EXEC SQL SELECT seats INTO :seats FROM theater WHERE tht_id = :tht_id;
+	EXEC SQL COMMIT;
+	printf("좌석 선택\n");
+
+	while(1) {
+		printf("1부터 %d까지 중에서 예매하실 좌석 번호를 입력해주세요. (0 입력시 종료) : ", seats);
+		scanf(" %d", &seat);	
+		if (seat > 0 && seat <= seats) {
+			seat_id = seat;
+
+			EXEC SQL COMMIT;
+			EXEC SQL SELECT count(res_id) INTO :res_id FROM reservation WHERE (scr_id = :scr_id) AND (seat_id = :seat_id);
+
+			if(res_id > 0) {
+				printf("이미 예매된 좌석입니다.\n");
+			}
+			else {
+				EXEC SQL SELECT * INTO :res_id FROM (SELECT data.*, ROWNUM rm FROM (SELECT res_id FROM reservation ORDER BY res_id DESC) data) WHERE rm <= 1;
+				if(sqlca.sqlcode != 0) {
+					EXEC SQL ROLLBACK;
+					res_id = 0;
+				}
+				else {
+					EXEC SQL COMMIT;				
+				}
+				res_id++;
+				EXEC SQL INSERT INTO reservation (res_id, cus_key, scr_id, seat_id) VALUES (:res_id, :cus_key, :scr_id, :seat_id);
+				EXEC SQL COMMIT;
+				printf("추가 예매 하시겠습니까? (1 제외 입력시 종료)\n");
+				printf("1. 예\n");
+				scanf(" %d", &input);
+				if(input != 1) {
+					return 1;
+				}
+			}
+		}
+		else if(seat == 0) {
+			return 1;
+		}
+	}
+}
+
+void checkReservation() {
+	int input;
+
+	EXEC SQL DECLARE res_cursor CURSOR FOR SELECT scr_id, seat_id FROM reservation WHERE cus_key = :cus_key ORDER BY res_id;
+	input = 1;
+	printf("시간\n");
+	EXEC SQL OPEN res_cursor;
+	while(1) {
+		EXEC SQL FETCH res_cursor
+		INTO :scr_id, :seat_id;
+		if(sqlca.sqlcode != 0) {
+			if(input == 1) {
+				printf("예매 기록이 없습니다.");
+			}
+			break;
+		}
+		else {
+			EXEC SQL SELECT mov_id, tht_id, scr_date, scr_time INTO :mov_id, :tht_id, :scr_date, :scr_time FROM screen WHERE scr_id = :scr_id;
+			EXEC SQL COMMIT;
+			EXEC SQL SELECT mov_name INTO :mov_name FROM movie WHERE mov_id = :mov_id;
+			EXEC SQL COMMIT;
+			printf("%d. 영화명 : %s, 상영관 : %d, 좌석번호 : %d, 상영일 : %d, 상영시간 : %d\n", input++, mov_name, tht_id, seat_id, scr_date, scr_time);		
+		}
+	}
+	EXEC SQL CLOSE res_cursor;	
+}
+
+int cancel() {
+	int input;
+	while(1) {
+		checkReservation();
+		printf("취소하고 싶은 예매항목을 입력하세요. (0 입력시 종료) :");
+		scanf(" %d", &input);
+		scr_id = input;
+		
+		if(input == 0) {
+			return 1;
+		}
+		else {
+			EXEC SQL SELECT * INTO :res_id FROM (SELECT data.*, ROWNUM rm FROM (SELECT res_id FROM reservation WHERE cus_key = :cus_key ORDER BY res_id) data) WHERE rm >= :scr_id AND rm <= :scr_id;
+			EXEC SQL COMMIT;	
+			EXEC SQL DELETE FROM reservation WHERE res_id = :res_id;
+			EXEC SQL COMMIT;
+			printf("취소되었습니다.\n");
+			printf("추가 취소 하시겠습니까? (1 제외 입력시 종료)\n");
+			printf("1. 예\n");
+			scanf(" %d", &input);
+			if(input != 1) {
+				return 1;
+			}
+		}
+	}
+}
+
+int searchMovie() {
+	int input;
+	EXEC SQL SELECT sum(mov_sales) INTO :sum FROM movie;
+	EXEC SQL COMMIT;
+	if(sum == 0) {
+		sum = 1;
+	}
+	EXEC SQL DECLARE mov_cursor2 CURSOR FOR SELECT mov_name, mov_sales FROM movie;
+	printf("영화명\t\t\t예매율\n");
+	EXEC SQL OPEN mov_cursor2;
+	input = 1;
+	while(1) {
+		EXEC SQL FETCH mov_cursor2
+		INTO :mov_name, :mov_sales;
+		if(sqlca.sqlcode != 0) {
+			EXEC SQL ROLLBACK WORK;
+			break;
+		}
+		else {
+			EXEC SQL COMMIT WORK;
+			printf("%d. %s\t%f\n", input++, mov_name, (mov_sales/(float)sum));
+		}
+	}
+	EXEC SQL CLOSE mov_cursor2;
+}
+
+int addMovie() {
+	printf("추가할 영화명 : ");
+	scanf(" %s", mov_name);
+	EXEC SQL SELECT count(mov_id) INTO :mov_id FROM movie;
+	EXEC SQL COMMIT;
+	mov_id++;
+	EXEC SQL INSERT INTO movie (mov_id, mov_name, mov_sales) VALUES (:mov_id, :mov_name, :mov_sales);
+	EXEC SQL COMMIT;
+}
+
+int modifyMovie() {
+	searchMovie();
+	printf("수정할 영화번호 : ");
+	scanf(" %d", &mov_id);
+	printf("변경될 영화명 : ");
+	scanf(" %s", mov_name);
+	EXEC SQL UPDATE movie SET mov_name = :mov_name WHERE mov_id = :mov_id;
+	EXEC SQL COMMIT;
+}
+
+void main() {
+
+	EXEC SQL CONNECT : usrname;
+
+	if(sqlca.sqlcode == 0) {
+		printf("Connected successfully...\n");
+
+		EXEC SQL CREATE TABLE customer (cus_key number, cus_id char(20), cus_pwd char(20), cus_name char(20), cus_birth char(20), cus_phone char(20) CONSTRAINT PK_CUSTOMER PRIMARY KEY(cus_key));
+		EXEC SQL CREATE TABLE movie (mov_id number, mov_name char(20), mov_sales Float CONSTRAINT PK_MOVIE PRIMARY KEY(mov_id));
+		EXEC SQL CREATE TABLE theater (tht_id number, seats number CONSTRAINT PK_THEATER PRIMARY KEY(tht_id));
+		EXEC SQL CREATE TABLE screen (scr_id number, mov_id number, tht_id number, scr_date number, scr_time number CONSTRAINT PK_SCREEN PRIMARY KEY(scr_id) CONSTRAINT FK_MOVIE FOREIGN KEY(mov_id) REFERENCE MOVIE(mov_id) CONSTRAINT FK_THEATER FOREIGN KEY(tht_id) REFERENCE THEATER(tht_id));
+		EXEC SQL CREATE TABLE reservation (res_id number, cus_key number, scr_id number, seat_id number CONSTRAINT PK_RESERVATION PRIMARY KEY(res_id) CONSTRAINT FK_CUSTOMER FOREIGN KEY(cus_key) REFERENCE CUSTOMER(cus_key) CONSTRAINT FK_SCREEN FOREIGN KEY(scr_id) REFERENCE SCREEN(scr_id));
+		EXEC SQL COMMIT;
+
+		printf("Table created. \n");
+
+		init();
+
+		inputExam();
+		
+		flag = -1;
+
+		while(1) {
+			// flag=-1 is login failed
+			if(flag == -1) {
+				flag = login();
+				// flag=0 is sign up
+				if(flag == 0) {
+					flag = signup();
+				}
+			}
+			// flag=1 is client's login
+			if(flag == 1) {
+				while(1) {
+					// show choice
+					flag = clientSelect();
+					// flag=3 is modifying personal information
+					if(flag == 3) {
+						modifyPerson();
+					}
+					// flag=4 is terminating sign up information
+					else if(flag == 4) {
+						flag = terminate();
+						if(flag == 0){
+							break;
+						}
+					}
+					// flag=5 show movie list
+					else if(flag == 5) {
+						checkMovie();
+					}
+					// flag=6 is reservating movie
+					else if(flag == 6) {
+						reservate();
+					}
+					// flag=7 show reservation list
+					else if(flag == 7) {
+						checkReservation();
+					}
+					// flag=8 is canceling reservation
+					else if(flag == 8) {
+						cancel();
+					}
+					// escape
+					else {
+						break;
+					}
+				}
+			}
+			// flag=2 is system's login
+			else if(flag == 2) {
+				while(1) {
+					// show choice
+					flag = systemSelect();
+					// flag=9 is adding movie
+					if(flag == 9) {
+						addMovie();
+					}
+					// flag=10 show movie list
+					else if(flag == 10) {
+						searchMovie();
+					}
+					// flag=11 is modifying movie
+					else if(flag == 11) {
+						modifyMovie();
+					}
+					// escape
+					else {
+						break;
+					}
+				}
+			}
+			if(flag != -1) {
+				// escape
+				break;
+			}
+		}
+	}	
+	EXEC SQL COMMIT WORK RELEASE;
+	exit(EXIT_SUCCESS);
+}
